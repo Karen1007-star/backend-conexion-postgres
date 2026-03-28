@@ -9,7 +9,7 @@ app.use(express.json());
 app.get("/tareas", async (req, res) => {
   try {
     // const time = await pool.query("SELECT NOW()");
-    const tareas = await pool.query('SELECT * FROM tareas');
+    const tareas = await pool.query('SELECT * FROM tareas ORDER BY id ASC');
 
     res.json({
     //   serverTime: time.rows[0],
@@ -38,16 +38,19 @@ app.patch("/tareas/:id", async (req,res)=>{
   try {
     const id = Number(req.params.id);
     const { titulo, completado } = req.body;
-    tarea = tarea.map((ta)=>{
-        if(ta.id===id){
-           return{
-            ...ta,
-            ...(titulo!=undefined ? {titulo} : {}),
-            ...(completado!=undefined ? {completado:!completado} : {})
-           }
-        }
-      return ta  
-    })
+    const actualizar = await pool.query(
+      `UPDATE tareas 
+       SET 
+         titulo = COALESCE($1, titulo),
+         completado = COALESCE($2, completado)
+       WHERE id = $3
+       RETURNING *`,
+      [titulo, completado, id]
+    );
+    if (actualizar.rows.length === 0) {
+      return res.status(404).json({ mensaje: "Tarea no encontrada" });
+    }
+    res.json(actualizar.rows[0]);
   } catch (error) {
     res.status(500).send({mensaje:"No se pudo modificar tarea"})
   }
